@@ -1,0 +1,7 @@
+# depslib dependency file v1.0
+1576052143 source:d:\programming\c\рс\battleship code\battleship 2\main.c
+	<stdio.h>
+	<stdlib.h>
+	<ctype.h>
+	<string.h>
+

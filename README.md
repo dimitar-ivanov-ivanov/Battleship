@@ -1,2 +1,2 @@
 # Battleship
-Implementation of 2D Battleship game.
+Implementation of 2D Battleship game written in C.

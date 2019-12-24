@@ -2,42 +2,41 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <time.h>
 
-#define MAXROWS 50
-#define MAXCOLS 50
+#define ROWS 10
+#define COLS 10
 #define SHIPDIRECTION 50
-#define MESSAGELEN 50
-#define INVALIDBOARDDIMENSIONS "Dimensions are too big"
+#define NUMBEROFSHIPS 5
+#define EMPTYSYMBOL '*'
+#define SHIPSYMBOL '^'
+#define SHOTSYMBOL '#'
+#define INVALIDDIRECTION "Invalid ship direction,input up/down/left/right"
 #define INVALIDSHIPPARAMETERS "Ship goes out of the board"
-#define INVALIDDIRECTION "Invalid ship direction,input vertical or horizontal"
-#define INVALIDLENGTH "Lenght is not valid"
-#define INVALIDSHIPS "Too many ships to build"
 #define SHIPALREDYTHERE "There is a ship alredy in that place"
 #define ALREDYSHOTTHERE "You have alredy shot in that place"
-#define SEPARATOR "---------------------------------------------------\n"
+#define YOURTURN "Your turn."
+#define ENEMYTURN "Enemy turn."
+#define SEPARATOR "     "
 
-static int rows = MAXROWS + 1;
-static int cols = MAXCOLS + 1;
-static int numberOfShips = 0;
-static int userPointsRemaining = 0;
-static int computerPointsRemaining = 0;
+int userPointsRemaining = 0;
+int computerPointsRemaining = 0;
 
 void runGame();
-void inputRowAndCol();
-void inputUserBoard(int userBoard[rows][cols]);
-void inputComputerBoard(int computerBoard[rows][cols]);
+void inputUserBoard(char userBoard[ROWS][COLS]);
+void putDefaultValuesOnBoard(char board[ROWS][COLS]);
+int checkWord(int len,char word[len],int validWordsRow,int validWordsCol,char validWords[validWordsRow][validWordsCol]);
+int checkInputParameters(int startRowShip, int startColShip, int endRowShip, int endColShip);
+int placeShipHorizontally(int startRowShip, int startColShip, int endRowShip, int endColShip, char board[ROWS][COLS],int direction);
+int placeShipVertically(int startRowShip, int startColShip, int endRowShip, int endColShip, char board[ROWS][COLS],int direction);
+void inputComputerBoard(char computerBoard[ROWS][COLS]);
 int generateRandomNumber(int lower,int upper);
-void printBoard(int userBoard[rows][cols]);
-int getNumberOfShips();
-void putDefaultValuesOnBoard(int userBoard[rows][cols]);
-int checkInputParameters(int startRowShip,int startColShip);
-int checkShipDirection(char fullShipDirection[SHIPDIRECTION]);
-int placeShipHorizontally(int startRowShip,int startColShip,int lenShip,int board[rows][cols],int currentIsUser);
-int placeShipVertically(int startRowShip,int startColShip,int lenShip,int board[rows][cols],int currentIsUser);
-void playGame(int userBoard[rows][cols],int computerBoard[rows][cols]);
-void playerShoots(int computerBoard[rows][cols]);
-void computerShoots(int userBoard[rows][cols]);
-void printBoardDuringGame(int board[rows][cols],char message[MESSAGELEN]);
+void printBoard(char board[ROWS][COLS]);
+void playGame(char userBoard[ROWS][COLS],char computerBoard[ROWS][COLS]);
+void playerShoots(char computerBoard[ROWS][COLS]);
+void computerShoots(char userBoard[ROWS][COLS]);
+void printDuringGame(char userBoard[ROWS][COLS],char computerBoard[ROWS][COLS]);
+void finishGame(char computerBoard[ROWS][COLS]);
 
 int main() {
     runGame();
@@ -45,316 +44,369 @@ int main() {
 }
 
 void runGame() {
-    inputRowAndCol();
-    int userBoard[rows][cols];
-    int computerBoard[rows][cols];
-
+    char userBoard[ROWS][COLS];
+    char computerBoard[ROWS][COLS];
     inputUserBoard(userBoard);
+    srand(time(NULL));
     inputComputerBoard(computerBoard);
     playGame(userBoard,computerBoard);
-
+    finishGame(computerBoard);
 }
 
-void inputRowAndCol() {
-    while(rows > MAXROWS || cols > MAXCOLS) {
-        printf("Input board dimensions: ");
-        scanf("%d %d",&rows,&cols);
-        if(rows > MAXROWS || cols > MAXCOLS) {
-            printf("%s","Dimensions are too big\n");
-        }
-    }
-}
-
-void inputUserBoard(int userBoard[rows][cols]) {
-    int i,startRowShip,startColShip,lenShip;
+void inputUserBoard(char userBoard[ROWS][COLS]) {
+    int i, startRowShip, startColShip, endRowShip, endColShip,lenShip;
     char shipDirection;
-    char fullShipDirection[SHIPDIRECTION];
 
-    numberOfShips = getNumberOfShips();
+    char fullShipDirection[SHIPDIRECTION];
+    int shipSizes[NUMBEROFSHIPS] = { 4, 3, 2, 2, 1 };
+    char validWords[8][10] = { "up","down","left","right","u","d","l","r" };
+
     putDefaultValuesOnBoard(userBoard);
 
     printf("Input ships:\n");
-    printf("Example Input: Row of ship,Column of ship,Length of ship,Ship direction: Horizontal or vertical\n");
+    printf("Example Input: Row of ship,Column of ship,Ship direction: UP|DOWN|LEFT|RIGHT\n");
 
-    //ROW COL LEN V/H
-    for(i = 0; i < numberOfShips; i++) {
-        //print board everytime so that player can keep track of ships placement
-        //printBoard(userBoard);
-        fflush(stdin);
-        scanf("%d %d %d %s",&startRowShip,&startColShip,&lenShip,fullShipDirection);
+    for (i = 0; i < NUMBEROFSHIPS; i++) {
+        printBoard(userBoard);
+        printf("Input ship with size %d:", shipSizes[i]);
+        scanf("%d %d %s", &startRowShip, &startColShip, fullShipDirection);
         fflush(stdin);
 
         //invalid input -> skip input
-        if(!checkInputParameters(startRowShip,startColShip)) {
-            //print the message here because we will reuse this function later on when we don't need the message imbedded
-            printf("%s\n",INVALIDSHIPPARAMETERS);
-            i--;
-            continue;
-        }
-
-        if(!checkShipDirection(fullShipDirection)) {
+        if (!checkWord(SHIPDIRECTION,fullShipDirection,8,10,validWords)) {
+            printf("%s\n",INVALIDDIRECTION);
             i--;
             continue;
         }
 
         shipDirection = fullShipDirection[0];
-        if(shipDirection == 'h') {
-            if(!placeShipHorizontally(startRowShip,startColShip,lenShip,userBoard,1)) {
-                i--;
-                continue;
-            }
-        } else if(shipDirection == 'v') {
-            if(!placeShipVertically(startRowShip,startColShip,lenShip,userBoard,1)) {
-                i--;
-                continue;
-            }
+        lenShip = shipSizes[i];
+        //add/remove one because the startingCell is of length 1
+        if (shipDirection == 'u') {
+            endRowShip = startRowShip - lenShip + 1;
+            endColShip = startColShip;
+        } else if (shipDirection == 'd') {
+            endRowShip = startRowShip + lenShip - 1;
+            endColShip = startColShip;
+        } else if (shipDirection == 'l') {
+            endRowShip = startRowShip;
+            endColShip = startColShip - lenShip + 1;
+        } else if (shipDirection == 'r') {
+            endRowShip = startRowShip;
+            endColShip = startColShip + lenShip - 1;
+        }
+
+        if (!checkInputParameters(startRowShip, startColShip, endRowShip, endColShip)) {
+            //print the message here because we will reuse this function later on when we don't need the message imbedded
+            printf("%s\n", INVALIDSHIPPARAMETERS);
+            i--;
+            continue;
+        }
+
+        if (shipDirection == 'u') {
+            //move one row up  row -1
+            placeShipVertically(startRowShip,startColShip,endRowShip,endColShip,userBoard,-1);
+        } else if (shipDirection == 'd') {
+            //move one row donw row + 1
+            placeShipVertically(startRowShip,startColShip,endRowShip,endColShip,userBoard,1);
+        } else if (shipDirection == 'l') {
+            //move one column left column -1
+            placeShipHorizontally(startRowShip, startColShip, endRowShip, endColShip, userBoard,-1);
+        } else if (shipDirection == 'r') {
+            //move one column right column + 1
+            placeShipHorizontally(startRowShip, startColShip, endRowShip, endColShip, userBoard,1);
         }
 
         //successfully placed ship
         userPointsRemaining += lenShip;
     }
-
-    printBoard(userBoard);
 }
 
-void inputComputerBoard(int computerBoard[rows][cols]) {
-    int i,startRowShip,startColShip,lenShip;
-    char shipDirection = 'h';
+void inputComputerBoard(char computerBoard[ROWS][COLS]) {
+    int i,startRowShip,startColShip,endRowShip,endColShip,indexDirection,lenShip;
+    int shipSizes[NUMBEROFSHIPS] = { 4, 3, 2, 2, 1 };
+    char directions[4] = {'u','d','l','r'};
+    char shipDirection;
+
     putDefaultValuesOnBoard(computerBoard);
 
-    for(i = 0; i < numberOfShips; i++) {
-        startRowShip = generateRandomNumber(0,rows / 2);
-        startColShip = generateRandomNumber(0,cols / 2);
-        lenShip = generateRandomNumber(0,rows / 2);
+    for(i = 0; i < NUMBEROFSHIPS; i++) {
+        startRowShip = generateRandomNumber(0,10);
+        startColShip = generateRandomNumber(0,10);
+        indexDirection = generateRandomNumber(0,4);
+        lenShip = shipSizes[i];
 
-        if(shipDirection == 'h') {
-            shipDirection = 'v';
-            if(!placeShipHorizontally(startRowShip,startColShip,lenShip,computerBoard,0)) {
-                i--;
-                continue;
-            }
-        } else if(shipDirection == 'v') {
-            shipDirection = 'h';
-            if(!placeShipVertically(startRowShip,startColShip,lenShip,computerBoard,0)) {
-                i--;
-                continue;
-            }
+        shipDirection = directions[indexDirection];
+
+        //add/remove one because the startingCell is of length 1
+        if (shipDirection == 'u') {
+            endRowShip = startRowShip - lenShip + 1;
+            endColShip = startColShip;
+        } else if (shipDirection == 'd') {
+            endRowShip = startRowShip + lenShip - 1;
+            endColShip = startColShip;
+        } else if (shipDirection == 'l') {
+            endRowShip = startRowShip;
+            endColShip = startColShip - lenShip + 1;
+        } else if (shipDirection == 'r') {
+            endRowShip = startRowShip;
+            endColShip = startColShip + lenShip - 1;
         }
+
+        if (!checkInputParameters(startRowShip, startColShip, endRowShip, endColShip)) {
+            i--;
+            continue;
+        }
+
+        if (shipDirection == 'u') {
+            //move one row up  row -1
+            placeShipVertically(startRowShip,startColShip,endRowShip,endColShip,computerBoard,-1);
+        } else if (shipDirection == 'd') {
+            //move one row donw row + 1
+            placeShipVertically(startRowShip,startColShip,endRowShip,endColShip,computerBoard,1);
+        } else if (shipDirection == 'l') {
+            //move one column left column -1
+            placeShipHorizontally(startRowShip, startColShip, endRowShip, endColShip, computerBoard,-1);
+        } else if (shipDirection == 'r') {
+            //move one column right column + 1
+            placeShipHorizontally(startRowShip, startColShip, endRowShip, endColShip, computerBoard,1);
+        }
+
         computerPointsRemaining += lenShip;
     }
-    printBoard(computerBoard);
 }
 
-void playGame(int userBoard[rows][cols],int computerBoard[rows][cols]) {
+void playGame(char userBoard[ROWS][COLS],char computerBoard[ROWS][COLS]) {
+    printDuringGame(userBoard,computerBoard);
+
     //1 for player turn
     //-1 for computer turn
     int playerTurn = 1;
-    char playerMessage[MESSAGELEN] = "Enemy";
-    char computerMessage[MESSAGELEN] = "Your";
 
     //when one player's points go to zero he loses
     while(userPointsRemaining >0 && computerPointsRemaining > 0) {
         if(playerTurn == 1) {
             //ask player for coordinates he shoots at computerBoard the place where he shoots becomes -1
-            printBoardDuringGame(computerBoard,playerMessage);
+            printf("%s\n",YOURTURN);
             playerShoots(computerBoard);
+            printDuringGame(userBoard,computerBoard);
+            printf("Computer remaining points: %d\n",computerPointsRemaining);
         } else if(playerTurn == -1) {
             //computer shoots at player board and shows where he shot and the condition of our board
+            printf("%s\n",ENEMYTURN);
             computerShoots(userBoard);
-            printBoardDuringGame(userBoard,computerMessage);
+            printDuringGame(userBoard,computerBoard);
             printf("User remaining points: %d\n",userPointsRemaining);
         }
 
         playerTurn *=-1;
     }
+
 }
 
-void playerShoots(int computerBoard[rows][cols]) {
-    int row = rows + 1;
-    int col = cols + 1;
+void playerShoots(char computerBoard[ROWS][COLS]) {
+    int row = ROWS;
+    int col = COLS;
 
     //make sure input is in bounds and also that we haven't shot in that place alredy
     //because if we keep shooting in the same place the game might go on forever
-    while(!checkInputParameters(row,col) && computerBoard[row][col] != -1) {
+    while(checkInputParameters(row,col,row,col) == 0) {
         printf("Take your shot at:");
         scanf("%d %d",&row,&col);
-        if(!checkInputParameters(row,col)){
+        if(!checkInputParameters(row,col,row,col)) {
             printf("%s\n",INVALIDSHIPPARAMETERS);
+            continue;
         }
-        if(computerBoard[row][col] == -1){
+        //if we alredy shot there make row and col invalid and continue loop
+        if(computerBoard[row][col] == SHOTSYMBOL) {
             printf("%s\n",ALREDYSHOTTHERE);
+            row =ROWS;
+            col = COLS;
+            continue;
         }
     }
 
-    //there is point there make it -1
-    if(computerBoard[row][col] == 1) {
-        computerBoard[row][col] = -1;
+    //there is point there make it #
+    if(computerBoard[row][col] == SHIPSYMBOL) {
         computerPointsRemaining--;
     }
 
-    //do nothing because the cell is empty
-    if(computerBoard[row][col] == 0) {
-    }
+    computerBoard[row][col] = SHOTSYMBOL;
 }
 
-void computerShoots(int userBoard[rows][cols]) {
-    int row = generateRandomNumber(0,rows-2);
-    int col = generateRandomNumber(0,cols-2);
+void computerShoots(char userBoard[ROWS][COLS]) {
+    int row = generateRandomNumber(0,10);
+    int col = generateRandomNumber(0,10);
 
-    //make sure that the computer shoots at a cell that he hasn't shot before
-    while(userBoard[row][col] != -1) {
-        row = generateRandomNumber(0,rows-2);
-        col = generateRandomNumber(0,cols-2);
+    //loop until we find a cell that we haven't shot into
+    while(userBoard[row][col] == SHOTSYMBOL) {
+        row = generateRandomNumber(0,10);
+        col = generateRandomNumber(0,10);
     }
 
-    if(userBoard[row][col] == 1) {
-        userBoard[row][col] = -1;
+    if(userBoard[row][col] == SHIPSYMBOL) {
         userPointsRemaining--;
     }
 
-    //do nothing because the cell is empty
-    if(userBoard[row][col] == 0) {
+    userBoard[row][col] = SHOTSYMBOL;
+}
+
+void finishGame(char computerBoard[ROWS][COLS]) {
+    if(userPointsRemaining == 0) {
+        printf("You lost");
+        printf("Enemy board");
+        printBoard(computerBoard);
+    } else if(computerPointsRemaining == 0) {
+        printf("You won,congratulations.");
     }
 }
 
-void printBoardDuringGame(int board[rows][cols],char message[MESSAGELEN]) {
-    //separating the rows with ---- and cols with | to be able to read the boards better
-    //2*cols because on every iteration we print one char with |
-    char *rowDelimeter = malloc(2*cols+1);
-    memset(rowDelimeter,'-',2*cols);
-    rowDelimeter[2*cols] = '\0';
-
-    printf("%s Board:\n",message);
-    for(int i = 0; i < rows; i++) {
-        for(int j = 0; j < cols; j++) {
-            if(board[i][j] != -1) {
-                printf("*|");
-            } else {
-                printf("%d|",board[i][j]); // -1
-            }
-        }
-        printf("\n%s\n",rowDelimeter);
-    }
-    printf("%s",SEPARATOR);
+int generateRandomNumber(int lower,int upper) {
+    return rand() % upper + lower;
 }
 
-int generateRandomNumber(int lower, int upper) {
-    //add 1 if rows and cols 1 -> they will become zero
-    return (rand() % (upper - lower)) + lower + 1;
-}
-
-void printBoard(int userBoard[rows][cols]) {
-    //0 - no ship
-    //1 - ship
-    //-1 - hit cell
-    for(int i = 0; i < rows; i++) {
-        for(int j = 0; j < cols; j++) {
-            printf("%d ",userBoard[i][j]);
-        }
-        printf("\n");
-    }
-    printf("%s",SEPARATOR);
-}
-
-int getNumberOfShips() {
-    //if one ships is exactly of length 1 the max ships we can build is rows * cols
-    int maxShips = rows * cols;
-    int numberOfShips = maxShips + 1;
-
-    while(numberOfShips > maxShips) {
-        printf("How many ships on your board: ");
-        scanf("%d",&numberOfShips);
-        if(numberOfShips > maxShips) {
-            printf("%s\n",INVALIDSHIPS);
-        }
-    }
-    return numberOfShips;
-}
-
-void putDefaultValuesOnBoard(int userBoard[rows][cols]) {
-    for(int i = 0; i < rows; i++) {
-        for(int j = 0; j < cols; j++) {
-            userBoard[i][j] = 0;
+void putDefaultValuesOnBoard(char board[ROWS][COLS]) {
+    int i,j;
+    for (i = 0; i < ROWS; i++) {
+        for (j = 0; j < COLS; j++) {
+            board[i][j] = EMPTYSYMBOL;
         }
     }
 }
 
-int checkInputParameters(int startRowShip,int startColShip) {
-    if(startColShip < 0 || startColShip >= cols || startRowShip < 0 || startRowShip >= rows) {
-        return 0;
-    }
-    return 1;
-}
+int checkWord(int len,char word[len],int validWordsRow,int validWordsCol,char validWords[validWordsRow][validWordsCol]) {
+    int i, validDirection;
 
-int checkShipDirection(char fullShipDirection[SHIPDIRECTION]) {
     //lower the direction in case the user inputted uppercase
-    for(int j= 0; j < strlen(fullShipDirection); j++) {
-        fullShipDirection[j] = (fullShipDirection[j] <= 'Z' && fullShipDirection[j] >= 'A') ?
-                               fullShipDirection[j] + 32 : fullShipDirection[j];
+    for (i = 0; i < strlen(word); i++) {
+        word[i] = (word[i] <= 'Z' && word[i] >= 'A') ? word[i] + 32 : word[i];
     }
 
-    //if direction word isn't horizontal or vertical get new ship
-    if(strcmp(fullShipDirection,"horizontal") && strcmp(fullShipDirection,"vertical") &&
-            strcmp(fullShipDirection,"h") && strcmp(fullShipDirection,"v")) {
-        printf("%s\n",INVALIDDIRECTION);
+    //if direction word isn't up/down/left/right get new ship
+    //if direction word isn't up/down/left/right get new ship
+    //if one of them is true -> 0 that means it wont go into the if
+    validDirection = 0;
+    for (i = 0; i < validWordsRow; i++) {
+        if (!strcmp(validWords[i], word)) {
+            validDirection = 1;
+            break;
+        }
+    }
+
+    return validDirection;
+}
+
+int checkInputParameters(int startRowShip, int startColShip, int endRowShip, int endColShip) {
+    if (startColShip < 0 || startColShip >= COLS || startRowShip < 0 || startRowShip >= ROWS ||
+            endRowShip < 0 || endRowShip >= ROWS || endColShip < 0 || endColShip >= COLS) {
         return 0;
     }
     return 1;
 }
 
-int placeShipHorizontally(int startRowShip,int startColShip,int lenShip,int board[rows][cols],int currentIsUser) {
-    //remove one because the startingCell is of length 1
-    //if the function is called from inputing the table for the user then print messages if it is called
-    //for the computer don't print
+int placeShipHorizontally(int startRowShip, int startColShip, int endRowShip, int endColShip, char board[ROWS][COLS],int direction) {
+    //check wheter one column or the other is smaller so we know from where to where to move
+    int i,start,end;
 
-    int i;
-    int endColShip = startColShip + lenShip - 1;
-    if(endColShip >= cols) {
-        if(currentIsUser) {
-            printf("%s\n",INVALIDSHIPPARAMETERS);
-        }
-        return 0;
+    if(startColShip < endColShip) {
+        start = startColShip;
+        end = endColShip;
+    } else {
+        start = endColShip;
+        end = startColShip;
     }
 
-    //ship alredy placed there
-    for(i = startColShip; i <= endColShip; i++) {
-        if(board[startRowShip][i] == 1) {
-            if(currentIsUser) {
-                printf("%s\n",SHIPALREDYTHERE);
-            }
+    //check if ship is alredy placed there
+    for (i = start; i <= end; i++) {
+        if (board[startRowShip][i] == SHIPSYMBOL) {
+            printf("%s\n", SHIPALREDYTHERE);
             return 0;
         }
     }
 
     //place ship
-    for(i = startColShip; i <= endColShip; i++) {
-        board[startRowShip][i] = 1;
+    for (i = start; i <= end; i++) {
+        board[startRowShip][i] = SHIPSYMBOL;
     }
     return 1;
 }
 
-int placeShipVertically(int startRowShip,int startColShip,int lenShip,int board[rows][cols],int currentIsUser) {
-    //remove one because the startingCell is of length 1
-    int i;
-    int endRowShip = startRowShip + lenShip - 1;
-    if(endRowShip >= rows) {
-        if(currentIsUser) {
-            printf("%s\n",INVALIDSHIPPARAMETERS);
-        }
-        return 0;
+int placeShipVertically(int startRowShip, int startColShip, int endRowShip, int endColShip, char board[ROWS][COLS],int direction) {
+    //check wheter one column or the other is smaller so we know from where to where to move
+    int i,start,end;
+
+    if(startRowShip < endRowShip) {
+        start = startRowShip;
+        end = endRowShip;
+    } else {
+        start = endRowShip;
+        end = startRowShip;
     }
-    //ship alredy placed there
-    for(i = startRowShip; i <= endRowShip; i++) {
-        if(board[i][startColShip] == 1) {
-            if(currentIsUser) {
-                printf("%s\n",SHIPALREDYTHERE);
-            }
+
+    for(i = start; i <= end; i++) {
+        if(board[i][startColShip] == SHIPSYMBOL) {
+            printf("%s\n",SHIPALREDYTHERE);
             return 0;
         }
     }
 
-    for(i = startRowShip; i <= endRowShip; i++) {
-        board[i][startColShip] = 1;
+    for(i = start; i <= end; i++) {
+        board[i][startColShip] = SHIPSYMBOL;
     }
-    return 1;
+
+    return 0;
+}
+
+void printBoard(char board[ROWS][COLS]) {
+    int i,j;
+    printf("_|");
+
+    for(i = 0; i < ROWS; i++) {
+        printf("%d|",i);
+    }
+
+    printf("\n");
+    for(i = 0; i < ROWS; i++) {
+        printf("%d|",i);
+        for(j = 0; j < COLS; j++) {
+            printf("%c|",board[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+void printDuringGame(char userBoard[ROWS][COLS],char computerBoard[ROWS][COLS]) {
+    int i,j;
+    printf("_|");
+    for(i = 0; i < ROWS; i++) {
+        printf("%d|",i);
+    }
+
+    printf("%s_|",SEPARATOR);
+    for(i =0; i< ROWS; i++) {
+        printf("%d|",i);
+    }
+
+    printf("\n");
+    for(i = 0; i < ROWS; i++) {
+        printf("%d|",i);
+        for(j = 0; j < COLS; j++) {
+            printf("%c|",userBoard[i][j]);
+        }
+
+        printf("%s",SEPARATOR);
+        printf("%d|",i);
+        for(j = 0; j < COLS; j++) {
+            //in the real game don't show the player where to shoot but in this case to test it show where the enemy ships are
+            //printf("%c|",computerBoard[i][j]);
+            //if we have a ship on this cell don't show it to the user
+            if(computerBoard[i][j] == SHIPSYMBOL) {
+                printf("*|");
+            } else {
+                printf("%c|",computerBoard[i][j]);
+            }
+
+        }
+        printf("\n");
+    }
 }

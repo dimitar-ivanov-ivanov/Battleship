@@ -1,7 +1,8 @@
 # depslib dependency file v1.0
-1576052143 source:d:\programming\c\ТУ\battleship code\battleship 2\main.c
+1577052884 source:d:\programming\c\ТУ\Курсова 2\battleship\main.c
 	<stdio.h>
 	<stdlib.h>
 	<ctype.h>
 	<string.h>
+	<time.h>
 

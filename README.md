@@ -1,0 +1,1 @@
+Battleship game where we ask the user to input his ships and place them on his board and after that the user and computer shoot at each others' boards until one of them has no ships left.
